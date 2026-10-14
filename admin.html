@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Leaders · The Gathering 2K26</title>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#2E2C20;--olive:#4D4834;--olive2:#5C563F;--cream:#D7CEB1;--paper:#ECE7D6;--black:#131618;--text:#1D1C14;--muted:#6A6550;--line:#CFC7AB;--err:#A8261D}
+*{box-sizing:border-box}
+body{margin:0;font-family:Jost,system-ui,sans-serif;background:linear-gradient(180deg,var(--olive) 0,var(--bg) 70%) fixed;color:var(--text);min-height:100vh}
+.wrap{max-width:980px;margin:0 auto;padding:26px 18px 50px}
+h1{font-family:'Bodoni Moda',serif;font-weight:400;text-transform:uppercase;color:var(--cream);font-size:clamp(26px,6vw,40px);margin:0 0 4px;letter-spacing:.02em}
+.top{color:var(--cream);margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.top p{margin:0;opacity:.8;font-size:14px}
+.panel{background:var(--paper);border-radius:6px;padding:20px;margin-bottom:18px}
+h2{font-family:'Bodoni Moda',serif;font-weight:500;font-size:22px;margin:0 0 12px}
+input,button{font:inherit}
+input[type=password]{width:100%;font-size:17px;padding:14px;border:2px solid var(--line);border-radius:6px;margin:10px 0}
+.btn{cursor:pointer;border:2px solid var(--black);background:var(--black);color:var(--cream);padding:11px 18px;border-radius:6px;font-weight:600}
+.btn.alt{background:none;color:var(--black)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.tab{cursor:pointer;border:2px solid var(--cream);background:none;color:var(--cream);padding:9px 16px;border-radius:6px;font-weight:600}
+.tab[aria-pressed=true]{background:var(--cream);color:var(--black)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{background:#fff;border:2px solid var(--line);border-radius:6px;padding:14px}
+.stat b{display:block;font-family:'Bodoni Moda',serif;font-size:36px;font-weight:500;line-height:1}
+.stat span{font-size:14px;color:var(--muted)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px;min-width:640px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:13px}
+a{color:var(--olive)}
+.err{color:var(--err)}
+.empty{color:var(--muted);margin:0}
+.flag{color:var(--err);font-weight:600}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.hide{display:none}
+:focus-visible{outline:3px solid var(--olive2);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div><h1>Leaders</h1><p>The Gathering 2K26 · live check-in numbers</p></div><p id="updated"></p></div>
+
+  <div id="login" class="panel">
+    <h2>Enter passcode</h2>
+    <form id="lf"><input id="pass" type="password" autocomplete="current-password" aria-label="Passcode"><div class="err" id="lerr" role="alert"></div><button class="btn" type="submit">View dashboard</button></form>
+  </div>
+
+  <div id="dash" class="hide">
+    <div class="tabs" id="tabs"></div>
+    <div class="panel"><h2>Headcount</h2><div class="stats" id="stats"></div></div>
+    <div class="panel"><div class="row"><h2 style="margin:0">First-timer follow-up</h2><button class="btn alt" id="csv">Download CSV</button></div><div class="scroll" id="first"></div></div>
+    <div class="panel"><h2>Ministers</h2><div class="scroll" id="mins"></div></div>
+    <div class="panel"><h2>Volunteers</h2><div class="scroll" id="vols"></div></div>
+    <div class="panel"><h2>Station tidiness and concerns</h2><div class="scroll" id="issues"></div></div>
+    <div class="panel"><h2>Children</h2><div class="scroll" id="kids"></div></div>
+  </div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const digits=s=>String(s||'').replace(/\D/g,'');
+const DAYS=['All days','Friday','Saturday','Sunday'];
+let pass='',rows=[],sel='All days',timer;
+const API = '/api';
+try{pass=sessionStorage.getItem('pw')||''}catch{}
+
+$('#lf').onsubmit=e=>{e.preventDefault();pass=$('#pass').value;load(true)};
+async function load(manual){
+  try{
+    const r=await fetch(API+'?passcode='+encodeURIComponent(pass));
+    const j=await r.json();
+    if(j.error==='denied'){ try{sessionStorage.removeItem('pw')}catch{} $('#login').classList.remove('hide'); $('#dash').classList.add('hide'); if(manual) $('#lerr').textContent='That passcode is not right.'; return; }
+    if(!j.rows) throw 0;
+    rows=j.rows;
+    try{sessionStorage.setItem('pw',pass)}catch{}
+    $('#login').classList.add('hide'); $('#dash').classList.remove('hide');
+    $('#updated').textContent='Updated '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+' · refreshes every 30 seconds';
+    render(); clearInterval(timer); timer=setInterval(()=>load(false),30000);
+  }catch{ if(manual) $('#lerr').textContent='Could not load data. Check your internet and try again.'; }
+}
+
+function table(head,items){
+  if(!items.length) return '<p class="empty">Nothing yet.</p>';
+  return `<table><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${items.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+const tel=p=>p?`<a href="tel:${esc(digits(p))}">${esc(p)}</a>`:'';
+const mail=m=>m?`<a href="mailto:${esc(m)}">${esc(m)}</a>`:'';
+
+function render(){
+  $('#tabs').innerHTML=DAYS.map(d=>`<button class="tab" aria-pressed="${d===sel}" data-d="${d}">${d}</button>`).join('');
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{sel=b.dataset.d;render()});
+  const R=rows.filter(r=>sel==='All days'||r['Day']===sel);
+  const guests=R.filter(r=>r['Role']==='Guest'&&r['Action']==='Check-in');
+  const uniq=a=>new Set(a.map(r=>digits(r['Phone'])||r['Name'].toLowerCase())).size;
+  const firsts=guests.filter(r=>r['Type']==='First-timer');
+  const mins=guests.filter(r=>r['Ministering?']==='Yes');
+
+  // volunteers: last action per person per day
+  const vstate={};
+  R.filter(r=>r['Role']==='Volunteer').forEach(r=>{const k=r['Day']+'|'+r['Name'].toLowerCase();vstate[k]={name:r['Name'],day:r['Day'],team:r['Station']||(vstate[k]||{}).team,action:r['Action'],time:r['Time']}});
+  const vlist=Object.values(vstate), vIn=vlist.filter(v=>v.action==='Check-in');
+
+  // children
+  const kidIn=R.filter(r=>r['Action']==='Child check-in');
+  const picked=new Set(R.filter(r=>r['Action']==='Child pick-up').map(r=>r['Day']+'|'+r['Pickup code']));
+  const kidStill=kidIn.filter(r=>!picked.has(r['Day']+'|'+r['Pickup code']));
+
+  const stats=[[uniq(guests),'Guests checked in'],[uniq(firsts),'First-timers'],[uniq(guests.filter(r=>r['Type'].startsWith('Member'))),'ACTS / AWCCI members'],[uniq(guests.filter(r=>r['Type']==='Returning non-member')),'Returning guests'],[uniq(mins),'Ministers'],[vlist.length,'Volunteers checked in'],[vIn.length,'Volunteers on duty now'],[kidStill.length,'Children in care']];
+  $('#stats').innerHTML=stats.map(([n,l])=>`<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
+
+  $('#first').innerHTML=table(['Name','Phone','Email','Home church','Heard from','Invited by','Prayer request','When'],
+    firsts.map(r=>[esc(r['Name']),tel(r['Phone']),mail(r['Email']),esc(r['Home church?']==='Yes'?r['Home church name']||'Yes':'None'),esc(r['Heard from']),esc(r['Invited by']),esc(r['Prayer request']),esc(r['Day']+' '+r['Time'])]));
+  $('#mins').innerHTML=table(['Name','Role','Phone','Day','Time'],mins.map(r=>[esc(r['Name']),esc(r['Ministry role']),tel(r['Phone']),esc(r['Day']),esc(r['Time'])]));
+  $('#vols').innerHTML=table(['Name','Station','Day','Status','Last action'],vlist.map(v=>[esc(v.name),esc(v.team),esc(v.day),v.action==='Check-in'?'On duty':'Checked out',esc(v.time)]));
+  const iss=R.filter(r=>r['Action']==='Check-out'&&r['Role']==='Volunteer'&&(r['Station status']!=='Yes'||r['Concerns']));
+  $('#issues').innerHTML=table(['Name','Station','Tidy?','Why it was not tidy','Concerns','When'],iss.map(r=>[esc(r['Name']),esc(r['Station']),r['Station status']==='Yes'?'All set':'<span class="flag">Needs attention</span>',esc(r['Station notes']),esc(r['Concerns']),esc(r['Day']+' '+r['Time'])]));
+  $('#kids').innerHTML=table(['Child','Age / grade','Parent','Phone','Allergies / notes','Other pickup','Status'],kidIn.map(r=>[esc(r['Name']),esc(r['Child age/grade']),esc(r['Parent/guardian']),tel(r['Phone']),esc(r['Allergies / notes']),esc(r['Authorized pickup']),picked.has(r['Day']+'|'+r['Pickup code'])?'Picked up':'<span class="flag">In care</span>']));
+
+  window._firsts=firsts;
+}
+$('#csv').onclick=()=>{
+  const f=window._firsts||[]; const cols=['Day','Date','Time','Name','Phone','Email','Home church?','Home church name','Heard from','Invited by','Prayer request'];
+  const q=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
+  const csv=[cols.map(q).join(',')].concat(f.map(r=>cols.map(c=>q(r[c])).join(','))).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='first-timers-'+sel.toLowerCase().replace(' ','-')+'.csv'; a.click();
+};
+if(pass) load(false);
+</script>
+</body>
+</html>
